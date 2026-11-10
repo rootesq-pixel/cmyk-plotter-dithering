@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CMYK Pen Plotter Dithering Studio - Vector Halftone Generator</title>
+    <meta name="description" content="Generador de Dithering CMYK vectorial con grosor de trazo constante y filtro Anti-Moiré para trazadores de pluma (Pen Plotter, AxiDraw, CNC).">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#161b26">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- JSZip for exporting ZIP of all 4 SVG layers -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body class="mobile-layout">
+    <div id="app">
+        <!-- Compact Top Navigation Bar -->
+        <header id="top-bar">
+            <div class="brand">
+                <div class="logo">
+                    <span class="cmyk-c">C</span><span class="cmyk-m">M</span><span class="cmyk-y">Y</span><span class="cmyk-k">K</span>
+                </div>
+                <div class="brand-text">
+                    <h1>Plotter Dithering <small class="badge-antimoire">Anti-Moiré Pro</small></h1>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <label for="image-upload" class="btn btn-primary btn-sm-mobile">
+                    📁 <span class="hide-mobile">Cargar Foto</span>
+                </label>
+                <input type="file" id="image-upload" accept="image/*" style="display:none;">
+
+                <button class="btn btn-accent btn-sm-mobile" id="btn-export-zip">
+                    📦 <span class="hide-mobile">Exportar 4 SVGs (ZIP)</span>
+                </button>
+
+                <!-- Fullscreen Canvas Toggle for Mobile -->
+                <button class="btn btn-secondary btn-sm-mobile" id="btn-toggle-fullscreen-canvas" title="Modo Pantalla Completa / Ocultar Controles">
+                    🖥️ <span class="hide-mobile">Pantalla Completa</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <main id="main-content">
+            <!-- Sidebar Controls (Collapsible Sheet on Mobile) -->
+            <aside id="sidebar" class="mobile-drawer">
+                <!-- Mobile Drag Handle -->
+                <div class="mobile-drawer-handle" id="mobile-drawer-toggle">
+                    <div class="handle-bar"></div>
+                    <span class="handle-title">⚙️ Controles & Capas CMYK (Toca para desplegar)</span>
+                </div>
+
+                <!-- Tab Controls -->
+                <div class="sidebar-tabs">
+                    <button class="tab-btn active" data-tab="tab-cmyk">🎨 CMYK & Moiré</button>
+                    <button class="tab-btn" data-tab="tab-motif">✏️ Motivo</button>
+                    <button class="tab-btn" data-tab="tab-plotter">📐 Plotter & SVG</button>
+                </div>
+
+                <!-- Tab 1: CMYK, Dithering & Anti-Moiré Controls -->
+                <div class="tab-content active" id="tab-cmyk">
+                    <!-- Presets & Advanced Pipeline Controls (UCR, Sobel, Profiles) -->
+                    <div class="panel-section antimoire-section">
+                        <h3>⚡ Perfil & Procesamiento Avanzado</h3>
+                        
+                        <div class="control-group">
+                            <label for="select-profile">Perfil Preset:</label>
+                            <select id="select-profile" class="form-control">
+                                <option value="soft">🌸 Suave (Tono Bajo / Acuarela)</option>
+                                <option value="balanced" selected>⚖️ Equilibrado (Recomendado)</option>
+                                <option value="crisp">🎯 Definido (Alto Contraste / Sobel)</option>
+                            </select>
+                        </div>
+
+                        <div class="control-group">
+                            <label>Detección de Bordes Sobel: <span id="val-sobel">50%</span></label>
+                            <input type="range" id="input-sobel" min="0" max="100" step="5" value="50">
+                        </div>
+
+                        <div class="control-group">
+                            <label>Extracción Under Color (UCR): <span id="val-ucr">80%</span></label>
+                            <input type="range" id="input-ucr" min="0" max="100" step="5" value="80">
+                        </div>
+                    </div>
+
+                    <!-- Anti-Moiré Filter Controls -->
+                    <div class="panel-section antimoire-section">
+                        <h3>🛡️ Filtro Anti-Moiré & Roseta CMYK</h3>
+                        
+                        <div class="control-group checkbox-group">
+                            <label for="input-antimoire-enable">Activar Supresor de Moiré</label>
+                            <input type="checkbox" id="input-antimoire-enable" checked>
+                        </div>
+
+                        <div class="control-group">
+                            <label>Desfase de Trama (Roseta):</label>
+                            <select id="select-antimoire-mode" class="form-control">
+                                <option value="rosette" selected>🌀 Trama en Roseta CMYK (Recomendado)</option>
+                                <option value="stochastic">🎲 Jitter Estocástico (Ruido Anti-Moiré)</option>
+                                <option value="standard">📐 Ángulos Estándar (15°, 75°, 0°, 45°)</option>
+                            </select>
+                        </div>
+
+                        <div class="control-group">
+                            <label>Suavizado de Frecuencia Espacial: <span id="val-antimoire-blur">1.5 px</span></label>
+                            <input type="range" id="input-antimoire-blur" min="0" max="4.0" step="0.5" value="1.5">
+                        </div>
+                    </div>
+
+                    <!-- Image Adjustments -->
+                    <div class="panel-section">
+                        <h3>🖼️ Ajustes de Imagen</h3>
+                        <div class="control-group">
+                            <label>Brillo: <span id="val-brightness">0</span></label>
+                            <input type="range" id="input-brightness" min="-100" max="100" value="0">
+                        </div>
+                        <div class="control-group">
+                            <label>Contraste: <span id="val-contrast">0</span></label>
+                            <input type="range" id="input-contrast" min="-100" max="100" value="0">
+                        </div>
+                        <div class="control-group">
+                            <label>Gama / Gamma: <span id="val-gamma">1.0</span></label>
+                            <input type="range" id="input-gamma" min="0.2" max="2.5" step="0.1" value="1.0">
+                        </div>
+                        <div class="control-group checkbox-group">
+                            <label for="input-invert">Invertir Tonos (Negativo)</label>
+                            <input type="checkbox" id="input-invert">
+                        </div>
+                    </div>
+
+                    <!-- Dithering Motif Selection -->
+                    <div class="panel-section">
+                        <h3>✨ Motivo de Dithering</h3>
+                        <div class="control-group">
+                            <label for="select-motif">Tipo de Motivo:</label>
+                            <select id="select-motif" class="form-control">
+                                <option value="circles" selected>🔴 Círculos (Halftone Matrix)</option>
+                                <option value="stripes">📏 Rayas / Líneas (Ángulos CMYK Anti-Moiré)</option>
+                                <option value="stars">⭐ Estrellas / Cruces Vectoriales</option>
+                                <option value="custom">🎨 Motivo Personalizado (Dibujado)</option>
+                            </select>
+                        </div>
+
+                        <div class="control-group">
+                            <label>Resolución de Rejilla (Espaciado mm): <span id="val-grid-size">4.0 mm</span></label>
+                            <input type="range" id="input-grid-size" min="1.0" max="12.0" step="0.5" value="4.0">
+                        </div>
+
+                        <div class="control-group">
+                            <label>Escala Máxima del Motivo: <span id="val-max-scale">100%</span></label>
+                            <input type="range" id="input-max-scale" min="20" max="150" value="100">
+                        </div>
+                    </div>
+
+                    <!-- Channel Visibility -->
+                    <div class="panel-section">
+                        <h3>👁️ Visibilidad de Capas CMYK</h3>
+                        <div class="channel-toggles">
+                            <label class="channel-btn yellow-btn">
+                                <input type="checkbox" id="toggle-yellow" checked>
+                                <span class="badge yellow">Y</span> Capa 1: Amarillo (0°)
+                            </label>
+                            <label class="channel-btn magenta-btn">
+                                <input type="checkbox" id="toggle-magenta" checked>
+                                <span class="badge magenta">M</span> Capa 2: Magenta (75°)
+                            </label>
+                            <label class="channel-btn cyan-btn">
+                                <input type="checkbox" id="toggle-cyan" checked>
+                                <span class="badge cyan">C</span> Capa 3: Cian (15°)
+                            </label>
+                            <label class="channel-btn black-btn">
+                                <input type="checkbox" id="toggle-key" checked>
+                                <span class="badge black">K</span> Capa 4: Negro (45°)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Custom Motif Designer -->
+                <div class="tab-content" id="tab-motif">
+                    <div class="panel-section">
+                        <h3>🎨 Diseñador de Motivo Propio</h3>
+                        <p class="section-desc">Dibuja una forma vectorial en la cuadrícula o importa una ruta SVG `d="..."`.</p>
+                        
+                        <div class="motif-canvas-container">
+                            <canvas id="motif-editor-canvas" width="240" height="240"></canvas>
+                        </div>
+
+                        <div class="btn-grid">
+                            <button class="btn btn-sm" id="btn-clear-motif">🗑️ Limpiar</button>
+                            <button class="btn btn-sm" id="btn-preset-heart">❤️ Corazón</button>
+                            <button class="btn btn-sm" id="btn-preset-hexagon">⬡ Hexágono</button>
+                            <button class="btn btn-sm" id="btn-preset-spiral">🌀 Espiral</button>
+                        </div>
+
+                        <div class="control-group margin-top">
+                            <label for="input-svg-path">Ruta SVG (`d="..."`):</label>
+                            <textarea id="input-svg-path" class="form-control code-font" rows="3" placeholder="M 10 10 L 90 90 M 90 10 L 10 90"></textarea>
+                        </div>
+                        <button class="btn btn-secondary btn-block" id="btn-apply-svg-path">Aplicar Ruta SVG</button>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Plotter & SVG Settings -->
+                <div class="tab-content" id="tab-plotter">
+                    <div class="panel-section">
+                        <h3>📐 Configuración de Pen Plotter</h3>
+                        <div class="control-group">
+                            <label for="input-stroke-width">Grosor de Trazo (Punta del Pluma / Pen Tip):</label>
+                            <div class="input-with-unit">
+                                <input type="number" id="input-stroke-width" min="0.1" max="5.0" step="0.05" value="0.50">
+                                <span class="unit">mm</span>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="select-paper-size">Tamaño de Papel:</label>
+                            <select id="select-paper-size" class="form-control">
+                                <option value="A4" selected>A4 (210 x 297 mm)</option>
+                                <option value="A3">A3 (297 x 420 mm)</option>
+                                <option value="Letter">Letter (216 x 279 mm)</option>
+                                <option value="Square">Cuadrado (200 x 200 mm)</option>
+                                <option value="Custom">Personalizado</option>
+                            </select>
+                        </div>
+
+                        <div class="custom-dims-row hidden" id="custom-dims-group">
+                            <div class="control-group">
+                                <label>Ancho (mm):</label>
+                                <input type="number" id="input-paper-width" value="210">
+                            </div>
+                            <div class="control-group">
+                                <label>Alto (mm):</label>
+                                <input type="number" id="input-paper-height" value="297">
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="select-orientation">Orientación:</label>
+                            <select id="select-orientation" class="form-control">
+                                <option value="portrait" selected>Vertical (Portrait)</option>
+                                <option value="landscape">Horizontal (Landscape)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Individual SVG Layer Export Buttons -->
+                    <div class="panel-section">
+                        <h3>💾 Descarga de Capas SVG por Separado (Orden de Impresión)</h3>
+                        <div class="export-buttons-list">
+                            <button class="btn btn-export-layer yellow-export" id="btn-export-yellow">
+                                ⬇️ Capa 1: <span id="filename-yellow">CMYK_Capa1_Amarillo_Grosor_0.50mm.svg</span>
+                            </button>
+                            <button class="btn btn-export-layer magenta-export" id="btn-export-magenta">
+                                ⬇️ Capa 2: <span id="filename-magenta">CMYK_Capa2_Magenta_Grosor_0.50mm.svg</span>
+                            </button>
+                            <button class="btn btn-export-layer cyan-export" id="btn-export-cyan">
+                                ⬇️ Capa 3: <span id="filename-cyan">CMYK_Capa3_Cyan_Grosor_0.50mm.svg</span>
+                            </button>
+                            <button class="btn btn-export-layer black-export" id="btn-export-key">
+                                ⬇️ Capa 4: <span id="filename-key">CMYK_Capa4_Negro_Grosor_0.50mm.svg</span>
+                            </button>
+                            <button class="btn btn-export-layer" id="btn-export-composite" style="margin-top: 15px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.05); color: #fff;">
+                                🌈 Descargar Todo Junto (1 SVG)
+                            </button>
+                            <button class="btn btn-export-layer" id="btn-export-png" style="margin-top: 15px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.05); color: #fff;">
+                                🖼️ Descargar como Imagen (PNG)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Interactive Canvas Viewport -->
+            <section id="viewport-container">
+                <!-- Viewport Toolbar -->
+                <div class="viewport-toolbar">
+                    <div class="view-mode-selector">
+                        <button class="mode-btn active" data-mode="composite">Composite</button>
+                        <button class="mode-btn" data-mode="yellow">Capa 1: Amarillo</button>
+                        <button class="mode-btn" data-mode="magenta">Capa 2: Magenta</button>
+                        <button class="mode-btn" data-mode="cyan">Capa 3: Cian</button>
+                        <button class="mode-btn" data-mode="key">Capa 4: Negro</button>
+                    </div>
+
+                    <div class="viewport-stats">
+                        <span id="stat-paths">Trazos: 0</span>
+                        <span id="stat-dims">210 x 297 mm</span>
+                    </div>
+                </div>
+
+                <!-- Canvas Display Area -->
+                <div class="canvas-wrapper" id="canvas-wrapper">
+                    <canvas id="main-preview-canvas"></canvas>
+                    <div class="empty-state" id="empty-state">
+                        <div class="empty-icon">📷</div>
+                        <h2>Carga una foto para comenzar</h2>
+                        <p>Arrastra una imagen aquí o haz clic en <strong>Cargar Foto</strong>.</p>
+                        <label for="image-upload-drop" class="btn btn-primary btn-lg">
+                            Seleccionar Imagen
+                        </label>
+                        <input type="file" id="image-upload-drop" accept="image/*" style="display:none;">
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Mobile Bottom Navigation Bar -->
+        <nav id="mobile-bottom-nav">
+            <button class="nav-item active" id="mobile-nav-cmyk" data-tab="tab-cmyk">
+                <span class="nav-icon">🎨</span>
+                <span class="nav-label">CMYK</span>
+            </button>
+            <button class="nav-item" id="mobile-nav-motif" data-tab="tab-motif">
+                <span class="nav-icon">✏️</span>
+                <span class="nav-label">Motivo</span>
+            </button>
+            <button class="nav-item" id="mobile-nav-plotter" data-tab="tab-plotter">
+                <span class="nav-icon">📐</span>
+                <span class="nav-label">Plotter</span>
+            </button>
+            <button class="nav-item" id="mobile-nav-fullscreen">
+                <span class="nav-icon">🔍</span>
+                <span class="nav-label">Ampliar</span>
+            </button>
+            <button class="nav-item" id="mobile-nav-export">
+                <span class="nav-icon">📦</span>
+                <span class="nav-label">Exportar</span>
+            </button>
+        </nav>
+
+        <!-- Google Play Store Guide Modal -->
+        <div class="modal-overlay hidden" id="modal-playstore">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h2>🤖 Guía de Publicación en Google Play Store</h2>
+                    <button class="modal-close" id="btn-close-playstore">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>Esta aplicación incluye la configuración completa con <strong>Capacitor Android</strong> para generar el paquete oficial <code>.aab</code> (Android App Bundle) requerido por <strong>Google Play Console</strong>.</p>
+                    
+                    <ol class="guide-steps">
+                        <li><strong>Instalar Dependencias:</strong> <code>npm install</code></li>
+                        <li><strong>Inicializar Android:</strong> <code>npx cap add android</code></li>
+                        <li><strong>Sincronizar Recursos:</strong> <code>npx cap sync android</code></li>
+                        <li><strong>Abrir en Android Studio & Generar Bundle (.aab):</strong> <code>npx cap open android</code></li>
+                    </ol>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" id="btn-understood-playstore">¡Entendido!</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=5"></script>
+</body>
+</html>

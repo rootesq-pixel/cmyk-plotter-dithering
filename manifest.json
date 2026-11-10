@@ -1,0 +1,17 @@
+{
+  "short_name": "CMYKPlotter",
+  "name": "CMYK Pen Plotter Dithering Studio",
+  "description": "Vector CMYK Dithering & Halftoning Generator for Pen Plotters and CNC",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230d1117'/><circle cx='35' cy='35' r='20' fill='%2300ffff' opacity='0.8'/><circle cx='65' cy='35' r='20' fill='%23ff00ff' opacity='0.8'/><circle cx='50' cy='65' r='20' fill='%23ffff00' opacity='0.8'/><circle cx='50' cy='50' r='12' fill='%23000000'/></svg>",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#0b0f19",
+  "theme_color": "#161b26",
+  "display": "standalone",
+  "orientation": "any"
+}
